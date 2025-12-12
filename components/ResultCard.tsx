@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { SocialPost } from '../types';
-import { PlatformIcon, Download, Copy, Check, Video, ImageIcon, FileText } from './Icons';
+import { SocialPost, Platform } from '../types';
+import { PlatformIcon, Download, Copy, Check, Video, ImageIcon, FileText, Share2 } from './Icons';
 
 interface ResultCardProps {
   post: SocialPost;
@@ -20,13 +20,12 @@ export const ResultCard: React.FC<ResultCardProps> = ({ post }) => {
 
   const handleDownloadArchive = () => {
     setDownloading(true);
-    // Simulate processing time
     setTimeout(() => {
       const element = document.createElement("a");
       const file = new Blob([JSON.stringify(post, null, 2)], {type: 'application/json'});
       element.href = URL.createObjectURL(file);
       element.download = `social-save-${post.platform}-${post.id.slice(0, 8)}.json`;
-      document.body.appendChild(element); // Required for this to work in FireFox
+      document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
       setDownloading(false);
@@ -36,10 +35,28 @@ export const ResultCard: React.FC<ResultCardProps> = ({ post }) => {
   const handleMediaDownload = () => {
     if (post.mediaUrl) {
       window.open(post.mediaUrl, '_blank');
-    } else {
-      alert("Direct media link was not found by the AI. This usually happens with private accounts or platform restrictions. You can still download the metadata archive.");
     }
   };
+
+  // Helper to get external downloader links
+  const getExternalDownloader = () => {
+    switch (post.platform) {
+      case Platform.TikTok:
+        return { name: "SSSTik.io", url: "https://ssstik.io/en" };
+      case Platform.Instagram:
+        return { name: "SnapInsta", url: "https://snapinsta.app/" };
+      case Platform.Twitter:
+        return { name: "TwitterVid", url: "https://twittervideodownloader.com/" };
+      case Platform.YouTube:
+        return { name: "SaveFrom", url: "https://en.savefrom.net/" };
+      case Platform.Facebook:
+        return { name: "FDown", url: "https://fdown.net/" };
+      default:
+        return null;
+    }
+  };
+
+  const externalTool = getExternalDownloader();
 
   return (
     <div className="w-full max-w-2xl bg-surface border border-gray-700/50 rounded-2xl overflow-hidden shadow-2xl mt-8 animate-fade-in-up">
@@ -65,10 +82,10 @@ export const ResultCard: React.FC<ResultCardProps> = ({ post }) => {
 
       <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
         
-        {/* Left Column: Visual & Quick Stats */}
+        {/* Left Column: Visual & Downloads */}
         <div className="flex flex-col gap-4">
           <div className="relative aspect-square w-full bg-gray-900 rounded-xl overflow-hidden border border-gray-700 group">
-             {/* Mock Preview - in a real app, this would be the actual scraped thumbnail */}
+             {/* Thumbnail / Placeholder */}
              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10" />
              <img 
                src={post.thumbnailUrl} 
@@ -81,27 +98,37 @@ export const ResultCard: React.FC<ResultCardProps> = ({ post }) => {
                 </p>
                 <div className="flex items-center gap-2 mt-2 text-xs text-gray-300">
                    {post.mediaType === 'video' ? <Video className="w-3 h-3" /> : <ImageIcon className="w-3 h-3" />}
-                   <span>{post.likes ? `${post.likes} Likes` : 'Metrics Hidden'}</span>
+                   <span>{post.likes} Likes</span>
                 </div>
              </div>
           </div>
           
-          <button 
-            onClick={handleMediaDownload}
-            className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all shadow-lg
-              ${post.mediaUrl 
-                ? 'bg-primary hover:bg-blue-600 text-white shadow-blue-900/20' 
-                : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-              }`}
-            disabled={!post.mediaUrl}
-          >
-            <Download className="w-5 h-5" />
-            {post.mediaUrl ? 'Download Media' : 'Media Not Accessible'}
-          </button>
-          {!post.mediaUrl && (
-             <p className="text-[10px] text-center text-gray-500">
-               * Direct media download restricted by platform. Use Archive.
-             </p>
+          {/* Primary Action Button */}
+          {post.mediaUrl ? (
+            <button 
+              onClick={handleMediaDownload}
+              className="w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all shadow-lg bg-primary hover:bg-blue-600 text-white shadow-blue-900/20"
+            >
+              <Download className="w-5 h-5" />
+              Download Media
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-xs text-yellow-200">
+                Direct media link protected by platform.
+              </div>
+              {externalTool && (
+                <a 
+                  href={externalTool.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all bg-gray-700 hover:bg-gray-600 text-white border border-gray-600"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Try {externalTool.name}
+                </a>
+              )}
+            </div>
           )}
         </div>
 

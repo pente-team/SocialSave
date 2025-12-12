@@ -27,33 +27,29 @@ export const analyzeSocialUrl = async (url: string): Promise<SocialPost> => {
       model: 'gemini-2.5-flash',
       contents: `Go to the following URL: ${url}
       
-      Your task is to analyze this social media post and extract metadata to create a structured archive.
+      Your task is to analyze this social media post and extract public metadata.
       
-      Please extract:
-      1. Author Name (username or display name)
-      2. The full text content/caption of the post.
-      3. Any visible hashtags.
-      4. The primary media type (is it a video, image, or text post?).
-      5. Engagement metrics (likes, shares) if visible in the snippet.
-      6. A brief 1-sentence summary of what the content is about.
-      7. **IMPORTANT**: If you can find a direct URL to the image or video file in the page source or metadata, extract it as 'mediaUrl'. If not, leave it null.
+      Instructions:
+      1. Use 'googleSearch' to find the page title, snippets, and public details about this post.
+      2. Extract the Author Name and Caption/Content.
+      3. **Media URL**: Try to find a direct link to the image or video file (ending in .jpg, .png, .mp4). 
+         *NOTE*: Most social platforms (Instagram, TikTok, YouTube) obfuscate direct media links. 
+         If you cannot find a functional direct link, simply return 'null' for 'mediaUrl'. 
+         DO NOT fail the request. Just return the metadata.
       
-      Use the 'googleSearch' tool to visit the page and gather this information.
-
-      Return a raw JSON object (no markdown formatting) with the following schema:
+      Return a raw JSON object (no markdown) with this schema:
       {
         "author": "string",
-        "content": "string",
+        "content": "string (the caption or post text)",
         "hashtags": ["string"],
         "mediaType": "video" | "image" | "text" | "unknown",
         "mediaUrl": "string" | null,
-        "likes": "string",
-        "analysis": "string"
+        "likes": "string (e.g. '1.2K')",
+        "analysis": "string (1 sentence summary)"
       }
       `,
       config: {
         tools: [{ googleSearch: {} }],
-        // responseMimeType and responseSchema are not allowed with googleSearch
       }
     });
 
@@ -65,8 +61,8 @@ export const analyzeSocialUrl = async (url: string): Promise<SocialPost> => {
     try {
         data = JSON.parse(jsonText);
     } catch (e) {
-        console.warn("Failed to parse JSON directly, attempting fallback or empty", jsonText);
-        data = {};
+        console.warn("Failed to parse JSON directly", jsonText);
+        throw new Error("The AI response was not in valid JSON format.");
     }
     
     // Construct the result object
@@ -75,21 +71,24 @@ export const analyzeSocialUrl = async (url: string): Promise<SocialPost> => {
       url: url,
       platform: detectedPlatform,
       author: data.author || "Unknown Author",
-      content: data.content || "",
+      content: data.content || "Content not available",
       hashtags: data.hashtags || [],
       mediaType: (data.mediaType as any) || "unknown",
       mediaUrl: data.mediaUrl || undefined,
       likes: data.likes || "N/A",
-      analysis: data.analysis || "No analysis available.",
-      // Using a generic placeholder based on platform if no real media URL is found 
-      // allows the UI to look good while being honest about AI limitations.
-      thumbnailUrl: `https://picsum.photos/seed/${detectedPlatform}${Date.now()}/400/300` 
+      analysis: data.analysis || "Metadata extracted successfully.",
+      // Random deterministic thumbnail for UI polish since real thumbnails are often CORS blocked
+      thumbnailUrl: `https://picsum.photos/seed/${encodeURIComponent(url.slice(-10))}/400/300` 
     };
 
     return post;
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Analysis Error:", error);
-    throw new Error("Failed to analyze the link. The post might be private or inaccessible.");
+    // Provide a more helpful error message to the UI
+    if (error.message && error.message.includes("400")) {
+      throw new Error("Invalid request. The URL might be malformed.");
+    }
+    throw new Error("Could not extract data. The post might be private, or the AI could not access the page content.");
   }
 };
