@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SocialPost, Platform } from '../types';
-import { PlatformIcon, Download, Copy, Check, Video, ImageIcon, FileText, Share2 } from './Icons';
+import { PlatformIcon, Download, Copy, Check, Video, ImageIcon, FileText, Share2, LinkIcon } from './Icons';
 
 interface ResultCardProps {
   post: SocialPost;
@@ -32,31 +32,48 @@ export const ResultCard: React.FC<ResultCardProps> = ({ post }) => {
     }, 800);
   };
 
-  const handleMediaDownload = () => {
+  // Smart Downloader Logic
+  const getDownloadAction = () => {
+    // Priority 1: Direct Link (if extracted by AI)
     if (post.mediaUrl) {
-      window.open(post.mediaUrl, '_blank');
+      return {
+        label: "Download Media",
+        url: post.mediaUrl,
+        icon: <Download className="w-5 h-5" />,
+        isExternal: false
+      };
     }
-  };
 
-  // Helper to get external downloader links
-  const getExternalDownloader = () => {
+    // Priority 2: Trusted 3rd Party Fallbacks
     switch (post.platform) {
       case Platform.TikTok:
-        return { name: "SSSTik.io", url: "https://ssstik.io/en" };
+        return { name: "SSSTik", url: "https://ssstik.io/en" };
       case Platform.Instagram:
         return { name: "SnapInsta", url: "https://snapinsta.app/" };
       case Platform.Twitter:
         return { name: "TwitterVid", url: "https://twittervideodownloader.com/" };
       case Platform.YouTube:
-        return { name: "SaveFrom", url: "https://en.savefrom.net/" };
+        // YouTube allows pre-filling the URL in some tools
+        return { 
+          name: "SaveFrom", 
+          url: `https://en.savefrom.net/1-youtube-video-downloader-434/?url=${encodeURIComponent(post.url)}` 
+        };
       case Platform.Facebook:
         return { name: "FDown", url: "https://fdown.net/" };
       default:
-        return null;
+        return { name: "External Tool", url: post.url }; // Fallback to original URL if unknown
     }
   };
 
-  const externalTool = getExternalDownloader();
+  const fallbackTool = !post.mediaUrl ? getDownloadAction() : null;
+
+  const handleMainAction = () => {
+    if (post.mediaUrl) {
+      window.open(post.mediaUrl, '_blank');
+    } else if (fallbackTool && 'url' in fallbackTool) {
+      window.open(fallbackTool.url as string, '_blank');
+    }
+  };
 
   return (
     <div className="w-full max-w-2xl bg-surface border border-gray-700/50 rounded-2xl overflow-hidden shadow-2xl mt-8 animate-fade-in-up">
@@ -103,32 +120,25 @@ export const ResultCard: React.FC<ResultCardProps> = ({ post }) => {
              </div>
           </div>
           
-          {/* Primary Action Button */}
-          {post.mediaUrl ? (
-            <button 
-              onClick={handleMediaDownload}
-              className="w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all shadow-lg bg-primary hover:bg-blue-600 text-white shadow-blue-900/20"
-            >
-              <Download className="w-5 h-5" />
-              Download Media
-            </button>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-xs text-yellow-200">
-                Direct media link protected by platform.
-              </div>
-              {externalTool && (
-                <a 
-                  href={externalTool.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all bg-gray-700 hover:bg-gray-600 text-white border border-gray-600"
-                >
-                  <Share2 className="w-4 h-4" />
-                  Try {externalTool.name}
-                </a>
-              )}
-            </div>
+          {/* Unified Smart Action Button */}
+          <button 
+            onClick={handleMainAction}
+            className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all shadow-lg 
+              ${post.mediaUrl 
+                ? 'bg-primary hover:bg-blue-600 text-white shadow-blue-900/20' 
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20'}`}
+          >
+            {post.mediaUrl ? <Download className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
+            {post.mediaUrl ? "Download Media" : `Download via ${(fallbackTool as any).name}`}
+          </button>
+          
+          {/* Subtle info text instead of warning box */}
+          {!post.mediaUrl && (
+             <div className="text-center">
+                <p className="text-[10px] text-gray-500">
+                   Direct link protected. Redirecting to external downloader.
+                </p>
+             </div>
           )}
         </div>
 
@@ -171,7 +181,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ post }) => {
                 ) : (
                   <>
                     <FileText className="w-4 h-4" />
-                    Download Post Archive (JSON)
+                    Download JSON Archive
                   </>
                 )}
              </button>

@@ -27,25 +27,28 @@ export const analyzeSocialUrl = async (url: string): Promise<SocialPost> => {
       model: 'gemini-2.5-flash',
       contents: `Go to the following URL: ${url}
       
-      Your task is to analyze this social media post and extract public metadata.
+      Your task is to analyze this social media post and extract public metadata with high precision.
       
       Instructions:
-      1. Use 'googleSearch' to find the page title, snippets, and public details about this post.
+      1. Use 'googleSearch' to retrieve the latest page content, title, and snippets.
       2. Extract the Author Name and Caption/Content.
-      3. **Media URL**: Try to find a direct link to the image or video file (ending in .jpg, .png, .mp4). 
-         *NOTE*: Most social platforms (Instagram, TikTok, YouTube) obfuscate direct media links. 
-         If you cannot find a functional direct link, simply return 'null' for 'mediaUrl'. 
-         DO NOT fail the request. Just return the metadata.
+      3. **Media URL Extraction (CRITICAL)**: 
+         - Search aggressively for direct media links in the page metadata.
+         - Look for <meta property="og:video">, <meta property="og:video:secure_url">, or <meta property="twitter:player:stream">.
+         - Look for <meta property="og:image"> if it's an image post.
+         - Check JSON-LD schema for "contentUrl" or "embedUrl".
+         - If found, return the full valid URL.
+         - Only return 'null' if the content is strictly behind a login wall that hides all metadata.
       
       Return a raw JSON object (no markdown) with this schema:
       {
         "author": "string",
-        "content": "string (the caption or post text)",
+        "content": "string (caption)",
         "hashtags": ["string"],
         "mediaType": "video" | "image" | "text" | "unknown",
         "mediaUrl": "string" | null,
-        "likes": "string (e.g. '1.2K')",
-        "analysis": "string (1 sentence summary)"
+        "likes": "string",
+        "analysis": "string (brief summary)"
       }
       `,
       config: {
@@ -54,7 +57,6 @@ export const analyzeSocialUrl = async (url: string): Promise<SocialPost> => {
     });
 
     let jsonText = response.text || "{}";
-    // Strip markdown code blocks if present
     jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
     
     let data;
@@ -65,7 +67,6 @@ export const analyzeSocialUrl = async (url: string): Promise<SocialPost> => {
         throw new Error("The AI response was not in valid JSON format.");
     }
     
-    // Construct the result object
     const post: SocialPost = {
       id: crypto.randomUUID(),
       url: url,
@@ -77,7 +78,6 @@ export const analyzeSocialUrl = async (url: string): Promise<SocialPost> => {
       mediaUrl: data.mediaUrl || undefined,
       likes: data.likes || "N/A",
       analysis: data.analysis || "Metadata extracted successfully.",
-      // Random deterministic thumbnail for UI polish since real thumbnails are often CORS blocked
       thumbnailUrl: `https://picsum.photos/seed/${encodeURIComponent(url.slice(-10))}/400/300` 
     };
 
@@ -85,7 +85,6 @@ export const analyzeSocialUrl = async (url: string): Promise<SocialPost> => {
 
   } catch (error: any) {
     console.error("Gemini Analysis Error:", error);
-    // Provide a more helpful error message to the UI
     if (error.message && error.message.includes("400")) {
       throw new Error("Invalid request. The URL might be malformed.");
     }
