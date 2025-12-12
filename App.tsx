@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { detectPlatform, analyzeSocialUrl } from './services/gemini';
 import { SocialPost, AnalysisState } from './types';
-import { PlatformIcon, LinkIcon, Loader2, Download } from './components/Icons';
+import { PlatformIcon, Loader2, Download } from './components/Icons';
 import { ResultCard } from './components/ResultCard';
 import { HistoryList } from './components/HistoryList';
 
