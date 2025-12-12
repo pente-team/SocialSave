@@ -1,0 +1,5 @@
+{
+  "name": "SocialSave AI",
+  "description": "An intelligent social media content analyzer and archiver. Paste a link to extract metadata, captions, and available media links using Gemini AI.",
+  "requestFramePermissions": []
+}
