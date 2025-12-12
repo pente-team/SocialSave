@@ -6,6 +6,11 @@ interface ResultCardProps {
   post: SocialPost;
 }
 
+interface DownloadOption {
+  name: string;
+  url: string;
+}
+
 export const ResultCard: React.FC<ResultCardProps> = ({ post }) => {
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -32,46 +37,69 @@ export const ResultCard: React.FC<ResultCardProps> = ({ post }) => {
     }, 800);
   };
 
-  // Smart Downloader Logic
-  const getDownloadAction = () => {
-    // Priority 1: Direct Link (if extracted by AI)
-    if (post.mediaUrl) {
-      return {
-        label: "Download Media",
-        url: post.mediaUrl,
-        icon: <Download className="w-5 h-5" />,
-        isExternal: false
-      };
-    }
-
-    // Priority 2: Trusted 3rd Party Fallbacks
+  // Enhanced Download Options Logic
+  const getDownloadOptions = (): DownloadOption[] => {
+    const encodedUrl = encodeURIComponent(post.url);
+    
     switch (post.platform) {
       case Platform.TikTok:
-        return { name: "SSSTik", url: "https://ssstik.io/en" };
+        return [
+          { name: "SSSTik", url: "https://ssstik.io/en" },
+          { name: "SnapTik", url: "https://snaptik.app/en" },
+          { name: "TikMate", url: "https://tikmate.online/" }
+        ];
       case Platform.Instagram:
-        return { name: "SnapInsta", url: "https://snapinsta.app/" };
+        return [
+          { name: "SnapInsta", url: "https://snapinsta.app/" },
+          { name: "FastDl", url: "https://fastdl.app/en" },
+          { name: "Indown", url: "https://indown.io/" }
+        ];
       case Platform.Twitter:
-        return { name: "TwitterVid", url: "https://twittervideodownloader.com/" };
+        return [
+          { name: "TwitterVid", url: "https://twittervideodownloader.com/" },
+          { name: "SSSTwitter", url: "https://ssstwitter.com/" },
+          { name: "X2Download", url: "https://x2download.app/en" }
+        ];
       case Platform.YouTube:
-        // YouTube allows pre-filling the URL in some tools
-        return { 
-          name: "SaveFrom", 
-          url: `https://en.savefrom.net/1-youtube-video-downloader-434/?url=${encodeURIComponent(post.url)}` 
-        };
+        return [
+          { name: "SaveFrom", url: `https://en.savefrom.net/1-youtube-video-downloader-434/?url=${encodedUrl}` },
+          { name: "Y2Mate", url: "https://y2mate.com/" },
+          { name: "10Downloader", url: "https://10downloader.com/en" }
+        ];
       case Platform.Facebook:
-        return { name: "FDown", url: "https://fdown.net/" };
+        return [
+          { name: "FDown", url: "https://fdown.net/" },
+          { name: "Snapsave", url: "https://snapsave.app/" }
+        ];
+      case Platform.LinkedIn:
+        return [
+          { name: "Taplio", url: "https://taplio.com/linkedin-video-downloader" },
+          { name: "ExpertsPHP", url: "https://www.expertsphp.com/linkedin-video-downloader/" }
+        ];
       default:
-        return { name: "External Tool", url: post.url }; // Fallback to original URL if unknown
+        return [
+          { name: "SaveFrom", url: "https://en.savefrom.net/" },
+          { name: "KeepVid", url: "https://keepv.id/" }
+        ];
     }
   };
 
-  const fallbackTool = !post.mediaUrl ? getDownloadAction() : null;
+  const downloadOptions = getDownloadOptions();
+  const primaryOption = downloadOptions[0];
+  const alternativeOptions = downloadOptions.slice(1);
 
   const handleMainAction = () => {
     if (post.mediaUrl) {
-      window.open(post.mediaUrl, '_blank');
-    } else if (fallbackTool && 'url' in fallbackTool) {
-      window.open(fallbackTool.url as string, '_blank');
+      // Create a temporary anchor to trigger download if possible, or open in new tab
+      const link = document.createElement('a');
+      link.href = post.mediaUrl;
+      link.target = '_blank';
+      link.download = `media-${post.id}`; // Hint to browser
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else if (primaryOption) {
+      window.open(primaryOption.url, '_blank');
     }
   };
 
@@ -120,7 +148,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ post }) => {
              </div>
           </div>
           
-          {/* Unified Smart Action Button */}
+          {/* Primary Action Button */}
           <button 
             onClick={handleMainAction}
             className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all shadow-lg 
@@ -129,16 +157,36 @@ export const ResultCard: React.FC<ResultCardProps> = ({ post }) => {
                 : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20'}`}
           >
             {post.mediaUrl ? <Download className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
-            {post.mediaUrl ? "Download Media" : `Download via ${(fallbackTool as any).name}`}
+            {post.mediaUrl ? "Download Media" : `Download via ${primaryOption?.name}`}
           </button>
           
-          {/* Subtle info text instead of warning box */}
-          {!post.mediaUrl && (
-             <div className="text-center">
-                <p className="text-[10px] text-gray-500">
-                   Direct link protected. Redirecting to external downloader.
+          {/* Fallback Options / Alternative Tools */}
+          {!post.mediaUrl && alternativeOptions.length > 0 && (
+             <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700/50">
+                <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-2 text-center">
+                   Alternative Downloaders
                 </p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                   {alternativeOptions.map((opt) => (
+                      <a 
+                        key={opt.name}
+                        href={opt.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition-colors flex items-center gap-1"
+                      >
+                         <LinkIcon className="w-3 h-3" />
+                         {opt.name}
+                      </a>
+                   ))}
+                </div>
              </div>
+          )}
+
+          {post.mediaUrl && (
+             <p className="text-[10px] text-gray-500 text-center">
+                Clicking download will open the media in a new tab. Save it from there.
+             </p>
           )}
         </div>
 
